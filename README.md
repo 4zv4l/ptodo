@@ -15,4 +15,4 @@ Ignore:
    Can write a [Directory]/.todoignore
    That will contain files to ignore
 ```
-for `.todoingore`, if the folder is `project` a file to ingore would be written `project/path/to/file`.
+for `.todoignore`, if the folder is `project` a file to ignore would be written `project/path/to/file`.
