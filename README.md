@@ -1,5 +1,7 @@
 # ptodo
-todo parser/list in Perl
+todo parser/list in Perl  
+Will generate a TODO.md that will contains all the TODO found in a project  
+The script keeps track if a TODO is done or undone.
 # Usage
 ```
 todo [OPTIONS] [Directory]
