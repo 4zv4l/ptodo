@@ -144,6 +144,6 @@ Ignore:
    to skip when generating the TODO.md
 Backup:
    In case something went wrong a backup of
-   your previous `TODO.md` will be made as `.TODO.md.bak`.\n";
+   your previous `TODO.md` will be made as `.TODO.md.bak`\n";
     exit $exit_code;
 }
