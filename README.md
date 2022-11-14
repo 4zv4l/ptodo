@@ -8,7 +8,8 @@ ptodo [OPTIONS] [Directory]
 
 OPTIONS:
    -h              show this help
-   -p              show undone tasks
+   -p              show undone tasks after analyse
+   -x              do not append previous matching .todoignore
 Directory:
    The Directory to analyse
 Ignore:
@@ -18,4 +19,5 @@ Ignore:
 ```
 # Ignore
 If you add a .todoignore in your project directory after running the script,  
-the files skipped won't be removed automatically from the `TODO.md`
+the files skipped won't be removed automatically from the `TODO.md`  
+except if you use the option `-x`.
