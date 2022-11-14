@@ -4,7 +4,7 @@ Will generate a TODO.md that will contains all the TODO found in a project
 The script keeps track if a TODO is done or undone.
 # Usage
 ```
-todo [OPTIONS] [Directory]
+ptodo [OPTIONS] [Directory]
 
 OPTIONS:
    -h              show this help
@@ -13,9 +13,9 @@ Directory:
    The Directory to analyse
 Ignore:
    Can write a [Directory]/.todoignore
-   That will contain files to ignore
+   Which contains files/extensions
+   to skip when generating the TODO.md
 ```
-for `.todoignore`, if the folder is `project` a file to ignore would be written `project/path/to/file`.  
-
-You can run `ptodo` from the directory itself using `ptodo .`  
-but then your `.todoignore` files should be like this `./path/to/file`.
+# Ignore
+If you add a .todoignore in your project directory after running the script,  
+the files skipped won't be removed automatically from the `TODO.md`
