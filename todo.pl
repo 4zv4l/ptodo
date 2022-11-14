@@ -42,6 +42,8 @@ if (-f $todo_md && -r $todo_md) {
     tie my @file_md, 'Tie::File', "$todo_md"
         or die "couldn't open $todo_md: $!\n";
     for(@file_md) {
+        # if -x then ignores todos from .todoignore
+        # from the previous TODO.md
         if($ignore) {
             if($_ =~ /- \[.\] (.*?): (.*)$/) {
                 my ($file, $todo) = ($1, $2);
