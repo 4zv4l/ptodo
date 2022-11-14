@@ -13,6 +13,7 @@ $ARGV[0] || usage(0);
 GetOptions (
     "h" => \ my $help,
     "p" => \ my $pending,
+    "x" => \ my $ignore,
 ) or usage(1);
 if($help) {usage(0)}
 # Check if dir is given and exists
@@ -41,6 +42,12 @@ if (-f $todo_md && -r $todo_md) {
     tie my @file_md, 'Tie::File', "$todo_md"
         or die "couldn't open $todo_md: $!\n";
     for(@file_md) {
+        if($ignore) {
+            if($_ =~ /- \[.\] (.*?): (.*)$/) {
+                my ($file, $todo) = ($1, $2);
+                next if any { $file =~ /$_/ } @skip_files;
+            }
+        }
         # mark todo undone if found
         # otherwise append them to the TODO.tmp
         # (keep track of TODO marked as done)
@@ -113,14 +120,15 @@ sub load_config {
 # on the exit code
 sub usage {
     my $exit_code = $_[0];
-    if($exit_code == 2) { warn "no directory to analyze\n\n" }
+    if($exit_code == 2) { warn "no directory to analyse\n\n" }
     if($exit_code == 3) { warn "$dir: not a directory\n\n" }
     print
 "ptodo [OPTIONS] [Directory]
 
 OPTIONS:
    -h              show this help
-   -p              show undone tasks
+   -p              show undone tasks after analyse
+   -x              do not append previous matching .todoignore
 Directory:
    The Directory to analyse
 Ignore:
