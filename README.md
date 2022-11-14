@@ -16,6 +16,9 @@ Ignore:
    Can write a [Directory]/.todoignore
    Which contains files/extensions
    to skip when generating the TODO.md
+Backup:
+   In case something went wrong a backup of
+   your previous `TODO.md` will be made as `.TODO.md.bak`
 ```
 # Ignore
 If you add a .todoignore in your project directory after running the script,  
