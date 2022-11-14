@@ -16,8 +16,7 @@ GetOptions (
 ) or usage(1);
 if($help) {usage(0)}
 # Check if dir is given and exists
-$ARGV[0] || usage(2);
-my $dir = $ARGV[0];
+my $dir = $ARGV[0] || usage(2);
 -d $dir || usage(3);
 
 # open the TODO.tmp file and load config
