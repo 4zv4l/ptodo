@@ -21,3 +21,5 @@ Ignore:
 If you add a .todoignore in your project directory after running the script,  
 the files skipped won't be removed automatically from the `TODO.md`  
 except if you use the option `-x`.
+# Backup
+In case something went wrong a backup of your previous `TODO.md` will be made as `.TODO.md.bak`.
