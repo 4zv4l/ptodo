@@ -17,5 +17,5 @@ Ignore:
 ```
 for `.todoignore`, if the folder is `project` a file to ignore would be written `project/path/to/file`.  
 
-You can run `ptodo` from the directory itself using `ptodo .`
+You can run `ptodo` from the directory itself using `ptodo .`  
 but then your `.todoignore` files should be like this `./path/to/file`.
