@@ -68,9 +68,7 @@ if($pending) { show_undone() }
 # add TODOs from a file to the TODO.md
 sub process_file {
     my ($filename) = @_;
-    if (any {/^$filename$/} @skip_files) {
-        return;
-    }
+    return if any { $filename =~ /$_/ } @skip_files;
     tie my @tmp, 'Tie::File', $filename
         or do {warn "couldn't process $filename: $!\n", return};
     for(@tmp) {
@@ -118,7 +116,7 @@ sub usage {
     if($exit_code == 2) { warn "no directory to analyze\n\n" }
     if($exit_code == 3) { warn "$dir: not a directory\n\n" }
     print
-"todo [OPTIONS] [Directory]
+"ptodo [OPTIONS] [Directory]
 
 OPTIONS:
    -h              show this help
@@ -127,8 +125,7 @@ Directory:
    The Directory to analyse
 Ignore:
    Can write a [Directory]/.todoignore
-   That will contain files to ignore
-   Their path should start from [Directory]/
-   Example: project/lib/std.h\n";
+   Which contains files/extensions
+   to skip when generating the TODO.md\n";
     exit $exit_code;
 }
