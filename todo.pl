@@ -5,6 +5,7 @@ use warnings;
 use Getopt::Long;
 use File::Find;
 use Tie::File;
+use List::Util qw(any);
 use feature 'say';
 
 # Check Arguments
@@ -27,6 +28,7 @@ tie my @file_tmp, 'Tie::File', "$todo_tmp"
 my @skip_files = load_config();
 
 # loop through the dir recursively
+# adding todos to TODO.tmp
 find(
     {
         wanted => sub { process_file($_) unless -d },
@@ -35,7 +37,7 @@ find(
     $dir
 );
 
-# if TODO.md exist check for tasks done/undone
+# if TODO.md exist and is readable check for tasks done/undone
 if (-f $todo_md && -r $todo_md) {
     tie my @file_md, 'Tie::File', "$todo_md"
         or die "couldn't open $todo_md: $!\n";
@@ -45,16 +47,13 @@ if (-f $todo_md && -r $todo_md) {
         # (keep track of TODO marked as done)
         if($_ =~ /- \[X\] (.*?): (.*)$/) {
             my ($file, $todo) = ($1, $2);
-            if(fgrep("$todo", @file_tmp)){    
-                push @file_tmp, "- [ ] $file: $todo";
-            } else {
+            unless(any {/$todo/} @file_tmp){    
                 push @file_tmp, "- [X] $file: $todo";
             }
-        }
         # mark todo done if not found anymore
-        if($_ =~ /- \[ \] (.*?): (.*)$/) {
+        } elsif($_ =~ /- \[ \] (.*?): (.*)$/) {
             my ($file, $todo) = ($1, $2);
-            if(!fgrep("$todo", @file_tmp)){    
+            unless(any {/$todo/} @file_tmp){    
                 push @file_tmp, "- [X] $file: $todo";
             }
         }
@@ -70,7 +69,7 @@ if($pending) { show_undone() }
 # add TODOs from a file to the TODO.md
 sub process_file {
     my ($filename) = @_;
-    if ( grep( /^$filename$/, @skip_files ) ) {
+    if (any {/^$filename$/} @skip_files) {
         return;
     }
     tie my @tmp, 'Tie::File', $filename
@@ -97,16 +96,6 @@ sub show_undone {
     }
 }
 
-# return 1 if substring in file
-sub fgrep {
-    my ($str, @file) = @_;
-    my $found = 0;
-    for(@file) {
-        if ($_ =~ /$str/) { $found = 1; last }
-    }
-    return $found;
-}
-
 # load $dir/.todoignore
 # containing files to ignore
 sub load_config {
@@ -122,6 +111,9 @@ sub load_config {
     return @files;
 }
 
+# show how to use the script
+# and a warning depending 
+# on the exit code
 sub usage {
     my $exit_code = $_[0];
     if($exit_code == 2) { warn "no directory to analyze\n\n" }
