@@ -84,7 +84,7 @@ sub process_file {
     my ($filename) = @_;
     return if any { $filename =~ /$_/ } @skip_files;
     tie my @tmp, 'Tie::File', $filename
-        or do {warn "couldn't process $filename: $!\n", return};
+        or do {warn "couldn't process $filename: $!\n"; return};
     for(@tmp) {
         if($_ =~ /TODO?[^ ]*(?:[\s]*)(.*?)\s*$/) {
             my $todo = $1;
