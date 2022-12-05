@@ -6,9 +6,7 @@ use Getopt::Long;
 use File::Find;
 use Tie::File;
 use List::Util qw(any);
-use feature 'say';
 
-# Check Arguments
 $ARGV[0] || usage(0);
 GetOptions (
     "h" => \ my $help,
@@ -16,11 +14,9 @@ GetOptions (
     "x" => \ my $ignore,
 ) or usage(1);
 if($help) {usage(0)}
-# Check if dir is given and exists
 my $dir = $ARGV[0] || usage(2);
 -d $dir || usage(3);
 
-# open the TODO.tmp file and load config
 my $todo_tmp = "$dir/TODO.tmp";
 my $todo_md = "$dir/TODO.md";
 my $todo_bk = "$dir/.TODO.md.bak";
@@ -73,10 +69,7 @@ if (-f $todo_md && -r $todo_md) {
     rename($todo_md, $todo_bk);
 }
 
-# move .tmp to .md
 rename($todo_tmp, $todo_md);
-
-# if -p show undone task
 if($pending) { show_undone() }
 
 # add TODOs from a file to the TODO.md
@@ -84,7 +77,7 @@ sub process_file {
     my ($filename) = @_;
     return if any { $filename =~ /$_/ } @skip_files;
     tie my @tmp, 'Tie::File', $filename
-        or do {warn "couldn't process $filename: $!\n"; return};
+        or warn "couldn't process $filename: $!\n" and return;
     for(@tmp) {
         if($_ =~ /TODO?[^ ]*(?:[\s]*)(.*?)\s*$/) {
             my $todo = $1;
@@ -93,22 +86,19 @@ sub process_file {
     }
 }
 
-# print undone task from TODO.md
 sub show_undone {
     my $counter = 0;
     for(@file_tmp) {
         if($_ =~ /- \[ \] (?:.*?): (.*)$/) {
-            say "- $1";
+            print "- $1\n";
             $counter++;
         }
     }
     if($counter == 0) {
-        say "No Task pending, you can rest now :)";
+        print "No Task pending, you can rest now :)\n";
     }
 }
 
-# load $dir/.todoignore
-# containing files to ignore
 sub load_config {
     open my $config, "$dir/.todoignore"
         or return ();
@@ -122,9 +112,6 @@ sub load_config {
     return @files;
 }
 
-# show how to use the script
-# and a warning depending 
-# on the exit code
 sub usage {
     my $exit_code = $_[0];
     if($exit_code == 2) { warn "no directory to analyse\n\n" }
