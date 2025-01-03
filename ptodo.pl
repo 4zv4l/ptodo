@@ -1,136 +1,204 @@
-#!/bin/env perl
+#!/usr/bin/env perl
 
-use strict;
-use warnings;
 use Getopt::Long;
+use Pod::Usage;
 use File::Find;
-use Tie::File;
-use List::Util qw(any);
+use File::Spec::Functions;
+use v5.38;
 
-$ARGV[0] || usage(0);
-GetOptions (
-    "h" => \ my $help,
-    "p" => \ my $pending,
-    "x" => \ my $ignore,
-) or usage(1);
-if($help) {usage(0)}
-my $dir = $ARGV[0] || usage(2);
--d $dir || usage(3);
-
-my $todo_tmp = "$dir/TODO.tmp";
-my $todo_md = "$dir/TODO.md";
-my $todo_bk = "$dir/.TODO.md.bak";
-tie my @file_tmp, 'Tie::File', "$todo_tmp"
-    or die "tmp file opening: $!\n";
-my @skip_files = load_config();
-
-# loop through the dir recursively
-# adding todos to TODO.tmp
-find(
-    {
-        wanted => sub { process_file($_) unless -d },
-        no_chdir => 1
-    },
-    $dir
-);
-
-# if TODO.md exist and is readable check for tasks done/undone
-if (-f $todo_md && -r $todo_md) {
-    tie my @file_md, 'Tie::File', "$todo_md"
-        or die "couldn't open $todo_md: $!\n";
-    for(@file_md) {
-        # if -x then ignores todos from .todoignore
-        # from the previous TODO.md
-        if($ignore) {
-            if($_ =~ /- \[.\] (.*?): (.*)$/) {
-                my ($file, $todo) = ($1, $2);
-                next if any { $file =~ /$_/ } @skip_files;
-            }
-        }
-        # mark todo undone if found
-        # otherwise append them to the TODO.tmp
-        # (keep track of TODO marked as done)
-        if($_ =~ /- \[X\] (.*?): (.*)$/) {
-            my ($file, $todo) = ($1, $2);
-            unless(any {/$todo/} @file_tmp){    
-                push @file_tmp, "- [X] $file: $todo";
-            }
-        # mark todo done if not found anymore
-        } elsif($_ =~ /- \[ \] (.*?): (.*)$/) {
-            my ($file, $todo) = ($1, $2);
-            unless(any {/$todo/} @file_tmp){    
-                push @file_tmp, "- [X] $file: $todo";
-            }
+# converts a hash to todo file content
+# ------------------------------------
+sub hash_to_todo(%hash) {
+    my $result;
+    # first dump the parentless todo
+    for my $todo_hash ($hash{todo}->@*) {
+        my ($todo, $status) = $todo_hash->@{'todo', 'status'}; 
+        $result .= sprintf "- [%s] %s\n", ($status == 1 ? 'X' : ' '), $todo;
+    }
+    # then dump the todos with filepath as parent
+    delete $hash{todo};
+    for my $file_path (keys %hash) {
+        $result .= "$file_path:\n";
+        for my $todo_hash ($hash{$file_path}->@*) {
+            my ($todo, $status) = $todo_hash->@{'todo', 'status'}; 
+            $result .= sprintf "    - [%s] %s\n", ($status == 1 ? 'X' : ' '), $todo;
         }
     }
-    # move .md to .md.bak
-    # backup the previous one in case
-    # something went wrong
-    rename($todo_md, $todo_bk);
+    return $result;
 }
 
-rename($todo_tmp, $todo_md);
-if($pending) { show_undone() }
+# converts a todo file content to hash
+# ------------------------------------
+sub todo_to_hash($todo) {
+    my %result;
+    my $current_file;
+    my @lines = split '\n', $todo;
+    for (@lines) {
+        # if its a filepath
+        if (not /^- / and /^(.+):$/) {
+            $current_file = $1;
+            $result{$current_file} = ();
+        # if its a parentless todo (without indentation)
+        } elsif (/^- \[(?<done>[Xx ])\] (?<todo>.+)/) {
+            push @{$result{todo}}, { todo => $+{todo}, status => $+{done} eq ' ' ? 0 : 1};
+        # if its a todo with a parent filepath (has indentation)
+        } elsif (/^\s+- \[(?<done>[Xx ])\] (?<todo>.+)/) {
+            push @{$result{$current_file}}, { todo => $+{todo}, status => $+{done} eq ' ' ? 0 : 1 };
+        }
+    }
+    return %result;
+}
 
-# add TODOs from a file to the TODO.md
-sub process_file {
-    my ($filename) = @_;
-    return if any { $filename =~ /$_/ } @skip_files;
-    tie my @tmp, 'Tie::File', $filename
-        or warn "couldn't process $filename: $!\n" and return;
-    for(@tmp) {
-        if($_ =~ /TODO?[^ ]*(?:[\s]*)(.*?)\s*$/) {
-            my $todo = $1;
-            push @file_tmp, "- [ ] $filename: $todo";
+# quick and dirty replacements for Path::Tiny
+# -------------------------------------------
+sub slurp($filepath) {
+    open my $file, '<', $filepath or die "open(): $!";
+    wantarray ? map {chomp; $_} (<$file>) : join '', <$file>;
+}
+sub spit($filepath, $data) {
+    open my $file, '>', $filepath or die "open(): $!";
+    print $file $data;
+}
+
+# parsing arguments
+# -----------------
+pod2usage(0) if @ARGV == 0;
+Getopt::Long::Configure ("bundling");
+GetOptions(
+    "l|list" => \my $list,
+    "u|undone" => \my $undone,
+    "v|verbose" => \my $verbose,
+    "h|help" => sub { pod2usage(0) },
+) or pod2usage(1);
+pod2usage({-message => "error: missing DIRECTORY", -exitval => 1}) if @ARGV == 0;
+my $directory_path = $ARGV[0] =~ s/^\.\///r; # remove the optional ./ from the directory path
+
+# check if directory exists
+# -------------------------
+die "$directory_path: No such readable directory\n" unless -d $directory_path and -e $directory_path; 
+
+# load TODO.md and .todoignore if exists
+# --------------------------------------
+my $todo_path = catfile($directory_path, "TODO.md");
+my $todoignore_path = catfile($directory_path, ".todoignore");
+my %old_todo = (-e $todo_path and -r $todo_path) ? todo_to_hash(scalar slurp($todo_path)) : ();
+my $todoignore = (-e $todoignore_path and -r $todoignore_path) ? join '|', slurp($todoignore_path) : undef;
+my %todo;
+
+# loop through files to add the TODOs
+# -----------------------------------
+find(sub {
+    return unless -f and -r and (-s) < (10 * 1024 * 1024); # skip 10M+ files
+    my $filepath = $File::Find::name;
+    say "checking $filepath" if $verbose;
+    if ($todoignore and $filepath =~ /$todoignore/) {
+        say "skipped because matches todoignore pattern" if $verbose;
+        return;
+    }
+    my @todos = map { /TODO[: ]+(.+)$/; {todo => $1, status => 0} } grep { /TODO/ } (slurp($_));
+    $todo{$filepath} = [] if @todos;
+    for my $todo (@todos) {
+        push @{$todo{$filepath}}, $todo;
+    }
+}, $directory_path);
+
+# diff between maybe existing TODO.md and in memory TODOs
+# -------------------------------------------------------
+push $todo{todo}->@*, $old_todo{todo}->@* if $old_todo{todo};
+delete $old_todo{todo};
+for my $filepath (keys %old_todo) {
+    for my $old_todo ($old_todo{$filepath}->@*) {
+        unless (grep { $old_todo->{todo} eq $_->{todo} } $todo{$filepath}->@*) {
+            push $todo{$filepath}->@*, {todo => $old_todo->{todo}, status => 1};
         }
     }
 }
 
-sub show_undone {
-    my $counter = 0;
-    for(@file_tmp) {
-        if($_ =~ /- \[ \] (?:.*?): (.*)$/) {
-            print "- $1\n";
-            $counter++;
-        }
-    }
-    if($counter == 0) {
-        print "No Task pending, you can rest now :)\n";
+# dump the todo to TODO.md and show undone task to STDOUT
+# -------------------------------------------------------
+my $todo_md = hash_to_todo(%todo);
+if ($list) {
+    print $todo_md if $list;
+} else {
+    spit($todo_path, $todo_md);
+    my @undone = grep { $_->{status} == 0 } $todo{todo}->@*;
+    print map { "- [ ] $_->{todo}\n" } @undone;
+    delete $todo{todo};
+    for my $filepath (keys %todo) {
+        my @undone = grep { $_->{status} == 0 } $todo{$filepath}->@*;
+        say "$filepath:" if @undone;
+        print map { "    - [ ] $_->{todo}\n" } @undone;
     }
 }
 
-sub load_config {
-    open my $config, "$dir/.todoignore"
-        or return ();
-    my @files;
-    while(<$config>) {
-        chomp;
-        unless ($_ =~ /^$/ || $_ =~ /^\s/ || $_ =~ /\s$/) {
-            push @files, $_;
-        }
-    }
-    return @files;
-}
+__END__
 
-sub usage {
-    my $exit_code = $_[0];
-    if($exit_code == 2) { warn "no directory to analyse\n\n" }
-    if($exit_code == 3) { warn "$dir: not a directory\n\n" }
-    print
-"ptodo [OPTIONS] [Directory]
+=head1 NAME
 
-OPTIONS:
-   -h              show this help
-   -p              show undone tasks after analyse
-   -x              do not append previous matching .todoignore
-Directory:
-   The Directory to analyse
-Ignore:
-   Can write a [Directory]/.todoignore
-   Which contains files/extensions
-   to skip when generating the TODO.md
-Backup:
-   In case something went wrong a backup of
-   your previous `TODO.md` will be made as `.TODO.md.bak`\n";
-    exit $exit_code;
-}
+todo - a simple todo manager
+
+=head1 SYNOPSIS
+
+    todo [OPTIONS] DIRECTORY
+
+    Options:
+        -h, --help       show this help message
+        -l, --list       show the TODOs without updating TODO.md
+        -v, --verbose    show each path before processing them
+
+=head1 DESCRIPTION
+
+I<todo> is a simple perl script that help managing your TODO in a project.
+
+It takes a directory to analyze as argument and will generate a TODO.md at the root of that directory with the found TODO.
+
+If a I<TODO.md> is already in the root of the directory, I<todo> will update that file, eventually marking some TODO as completed if they are not found in any sub path.
+
+=head1 PARENTLESS TODOs
+
+TODOs with no filepath as parent will not be tracked, they require to be automatically added and marked as
+done in TODO.md.
+
+=head1 PROCESS
+
+=over
+
+=item *
+
+Check if there is a I<TODO.md> in the target directory. If yes, load it as a hash.
+
+=item *
+
+Loop recursively in the filesystem to find all file that are readable and less than 10Mb in size.
+
+When finding one, will loop through the lines of the file and capture all TODOs which can be in those formats:
+
+    TODO something to do
+    TODO  something to do
+    TODO: something to do
+    TODO:  something todo
+    ...
+
+Basically any amount of I<:> or space can be added after the word I<TODO>.
+
+=item *
+
+Will loop through the TODOs in the I<TODO.md> if any, to see which TODOs to mark as done (if they are not found in the files we check earlier).
+
+But skip the parentless TODOs are those one cannot be tracked (no file to check).
+
+=item *
+
+Finally, the todo hash will be converted into a markdown TODO list and depending on the given options will update the I<TODO.md> or print it to STDOUT.
+
+By default I<todo> will update I<TODO.md> and only show pending tasks to STDOUT.
+
+=back
+
+=head1 IGNORE
+
+If you add a I<.todoignore> file at the root of the directory to analyse, I<todo> will skip matching path(s).
+
+=head1 AUTHOR
+
+4zv4l I<4zv4l@protonmail.com>
