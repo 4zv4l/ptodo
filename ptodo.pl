@@ -181,6 +181,14 @@ When finding one, will loop through the lines of the file and capture all TODOs 
 
 Basically any amount of I<:> or space can be added after the word I<TODO>.
 
+The TODO line I<MUST> starts by a "comment" such as '#' or '//' or ';' or '--':
+
+    # TODO something to do   (script langs)
+    // TODO  something to do (C like)
+    ;  TODO: something to do (asm)
+    -- TODO:  something todo (lua)
+    ...
+
 =item *
 
 Will loop through the TODOs in the I<TODO.md> if any, to see which TODOs to mark as done (if they are not found in the files we check earlier).

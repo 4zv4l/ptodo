@@ -55,7 +55,7 @@
 .\" ========================================================================
 .\"
 .IX Title "PTODO 1"
-.TH PTODO 1 2025-01-03 "perl v5.40.0" "User Contributed Perl Documentation"
+.TH PTODO 1 2025-01-23 "perl v5.40.0" "User Contributed Perl Documentation"
 .\" For nroff, turn off justification.  Always turn off hyphenation; it makes
 .\" way too many mistakes in technical documents.
 .if n .ad l
@@ -101,6 +101,16 @@ When finding one, will loop through the lines of the file and capture all TODOs 
 .Ve
 .Sp
 Basically any amount of \fI:\fR or space can be added after the word \fITODO\fR.
+.Sp
+The TODO line \fIMUST\fR starts by a "comment" such as '#' or '//' or ';' or '\-\-':
+.Sp
+.Vb 5
+\&    # TODO something to do   (script langs)
+\&    // TODO  something to do (C like)
+\&    ;  TODO: something to do (asm)
+\&    \-\- TODO:  something todo (lua)
+\&    ...
+.Ve
 .IP \(bu 4
 Will loop through the TODOs in the \fITODO.md\fR if any, to see which TODOs to mark as done (if they are not found in the files we check earlier).
 .Sp

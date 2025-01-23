@@ -39,6 +39,14 @@ done in TODO.md.
 
     Basically any amount of _:_ or space can be added after the word _TODO_.
 
+    The TODO line _MUST_ starts by a "comment" such as '#' or '//' or ';' or '--':
+
+        # TODO something to do   (script langs)
+        // TODO  something to do (C like)
+        ;  TODO: something to do (asm)
+        -- TODO:  something todo (lua)
+        ...
+
 - Will loop through the TODOs in the _TODO.md_ if any, to see which TODOs to mark as done (if they are not found in the files we check earlier).
 
     But skip the parentless TODOs are those one cannot be tracked (no file to check).
