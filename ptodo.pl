@@ -95,7 +95,7 @@ find(sub {
         say "skipped because matches todoignore pattern" if $verbose;
         return;
     }
-    my @todos = map { /TODO[: ]+(.+)$/; {todo => $1, status => 0} } grep { /TODO/ } (slurp($_));
+    my @todos = map { /TODO[: ]+(.+)$/; {todo => $1, status => 0} } grep { /^(#|--|\/\/|;)(\s+)?TODO[: ]+(.+)$/ } (slurp($_));
     $todo{$filepath} = [] if @todos;
     for my $todo (@todos) {
         push @{$todo{$filepath}}, $todo;
